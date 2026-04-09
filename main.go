@@ -116,11 +116,11 @@ func (s *Server) findByVideoID(videoID string) (*Track, error) {
 	return scanTrack(row)
 }
 
-func (s *Server) insertTrack(t *Track) (int64, error) {
+func (s *Server) insertTrack(t *Track, owner string) (int64, error) {
 	res, err := s.db.Exec(
-		`INSERT INTO tracks (video_id, title, artist, status, log, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		t.VideoID, t.Title, t.Artist, t.Status, t.Log,
+		`INSERT INTO tracks (video_id, title, artist, status, log, owner, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		t.VideoID, t.Title, t.Artist, t.Status, t.Log, owner,
 		t.CreatedAt.Format(time.RFC3339Nano), t.UpdatedAt.Format(time.RFC3339Nano))
 	if err != nil {
 		return 0, err
@@ -186,6 +186,8 @@ func (s *Server) download(t Track) {
 	u, err := url.Parse("https://music.youtube.com")
 	if err != nil {
 		log.Println("failed to parse url: ", err)
+		t.Status = StatusFailed
+		t.Log = err.Error()
 		return
 	}
 
@@ -230,6 +232,13 @@ func (s *Server) download(t Track) {
 // ─────────────────────────────────────────────
 
 func (s *Server) handleCheck(w http.ResponseWriter, r *http.Request) {
+	owner := r.PathValue("owner")
+	if owner == "" {
+		w.WriteHeader(http.StatusUnauthorized)
+		log.Println("no owner specified")
+		return
+	}
+
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -237,6 +246,13 @@ func (s *Server) handleCheck(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleDownload(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodOptions {
 		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	owner := r.PathValue("owner")
+	if owner == "" {
+		w.WriteHeader(http.StatusUnauthorized)
+		log.Println("no owner specified")
 		return
 	}
 
@@ -298,7 +314,7 @@ func (s *Server) handleDownload(w http.ResponseWriter, r *http.Request) {
 		UpdatedAt: now,
 	}
 
-	id, err := s.insertTrack(&t)
+	id, err := s.insertTrack(&t, owner)
 	if err != nil {
 		http.Error(w, "db error: "+err.Error(), http.StatusInternalServerError)
 		log.Println("failed to insert track: ", err)
@@ -462,13 +478,20 @@ func handleUI(w http.ResponseWriter, r *http.Request) {
 // Helpers
 // ─────────────────────────────────────────────
 
-func (s *Server) isValidKey(rawKey string) bool {
+func (s *Server) isValidKey(rawKey string) (owner string, err error) {
 	h := sha256.Sum256([]byte(rawKey))
 	hex := fmt.Sprintf("%x", h)
 
-	var count int
-	err := s.db.QueryRow(`SELECT COUNT(*) FROM keys WHERE key = ?`, hex).Scan(&count)
-	return err == nil && count > 0
+	row := s.db.QueryRow(`SELECT owner FROM keys WHERE key = ?`, hex)
+	if row.Err() != nil {
+		return "", row.Err()
+	}
+
+	if err := row.Scan(&owner); err != nil {
+		return "", err
+	}
+
+	return
 }
 
 func (s *Server) requireAuth(next http.HandlerFunc) http.HandlerFunc {
@@ -491,12 +514,16 @@ func (s *Server) requireAuth(next http.HandlerFunc) http.HandlerFunc {
 			http.Error(w, "missing API key", http.StatusUnauthorized)
 			return
 		}
-		if !s.isValidKey(key) {
-			log.Println("Invalid api key")
+
+		owner, err := s.isValidKey(key)
+		if err != nil {
+			log.Println("Invalid api key: ", err)
 
 			http.Error(w, "invalid API key", http.StatusUnauthorized)
 			return
 		}
+
+		r.SetPathValue("owner", owner)
 
 		next(w, r)
 	}
@@ -511,6 +538,7 @@ func mustMigrateDB(db *sql.DB) {
 		CREATE TABLE IF NOT EXISTS tracks (
 			id         INTEGER PRIMARY KEY AUTOINCREMENT,
 			video_id   TEXT NOT NULL UNIQUE,
+			owner      TEXT NOT NULL,
 			title      TEXT,
 			artist     TEXT,
 			status     TEXT NOT NULL DEFAULT 'queued',
