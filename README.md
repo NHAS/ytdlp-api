@@ -1,6 +1,6 @@
 # Yt-dlp Api
 
-![A picture showing the main UI](images/main_page.png.png)
+![A picture showing the main UI](images/main_page.png)
 
 This is a very simple project that provides an api for the associated extension. 
 In essence it is a wrapper around the `yt-dlp` command line tool, but enables you to record the music you listen to, as you listen to it. 
