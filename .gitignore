@@ -1,0 +1,4 @@
+config.json
+youtubedl-server
+ytdl.db*
+downloads/*

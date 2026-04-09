@@ -1,0 +1,924 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Downloads</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet" />
+    <style>
+        :root {
+            --bg: #080b0f;
+            --card: #0e1318;
+            --border: #1c2530;
+            --accent: #00e5ff;
+            --accent2: #ff4081;
+            --warn: #ffab40;
+            --ok: #69ff9a;
+            --txt: #d6e4f0;
+            --muted: #4a6070;
+            --radius: 8px;
+            --mono: 'JetBrains Mono', monospace;
+            --display: 'Syne', sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0
+        }
+
+        html,
+        body {
+            height: 100%;
+            background: var(--bg);
+            color: var(--txt);
+            font-family: var(--display);
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 9999;
+            background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0, 0, 0, .08) 2px, rgba(0, 0, 0, .08) 4px);
+        }
+
+        header {
+            padding: 28px 32px 24px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: flex-end;
+            gap: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        header::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--accent), transparent);
+        }
+
+        .stats {
+            margin-left: auto;
+            display: flex;
+            gap: 24px;
+            font-family: var(--mono);
+            font-size: 11px;
+            text-align: center;
+        }
+
+        .stat-val {
+            font-size: 22px;
+            font-weight: 700;
+            line-height: 1;
+            margin-bottom: 2px;
+        }
+
+        .stat-val.accent {
+            color: var(--accent)
+        }
+
+        .stat-val.ok {
+            color: var(--ok)
+        }
+
+        .stat-val.warn {
+            color: var(--warn)
+        }
+
+        .stat-val.err {
+            color: var(--accent2)
+        }
+
+        .stat-lbl {
+            color: var(--muted)
+        }
+
+        .conn-pill {
+            font-family: var(--mono);
+            font-size: 10px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--muted);
+        }
+
+        header {
+            align-items: center;
+        }
+
+        /* was align-items: flex-end */
+
+        .left-cluster {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .btn-register {
+            font-family: var(--mono);
+            font-size: 10px;
+            letter-spacing: .06em;
+            text-transform: uppercase;
+            padding: 6px 14px;
+            border-radius: var(--radius);
+            border: 1px solid rgba(0, 229, 255, .35);
+            background: rgba(0, 229, 255, .08);
+            color: var(--accent);
+            cursor: pointer;
+            transition: background .2s, border-color .2s;
+            display: flex;
+            align-items: center;
+            gap: 7px;
+        }
+
+        .btn-register:hover {
+            background: rgba(0, 229, 255, .15);
+            border-color: rgba(0, 229, 255, .6);
+        }
+
+        .btn-register:active {
+            transform: scale(.98);
+        }
+
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, .7);
+            z-index: 100;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-overlay.open {
+            display: flex;
+        }
+
+        .modal {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 28px 28px 24px;
+            width: 340px;
+            font-family: var(--mono);
+        }
+
+        .modal h3 {
+            font-family: var(--display);
+            font-size: 14px;
+            font-weight: 700;
+            margin-bottom: 18px;
+        }
+
+        .modal label {
+            display: block;
+            font-size: 9px;
+            letter-spacing: .1em;
+            text-transform: uppercase;
+            color: var(--muted);
+            margin-bottom: 6px;
+        }
+
+        .modal input {
+            width: 100%;
+            background: #04070a;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            color: var(--txt);
+            font-family: var(--mono);
+            font-size: 12px;
+            padding: 9px 12px;
+            margin-bottom: 18px;
+            outline: none;
+            transition: border-color .2s;
+        }
+
+        .modal input:focus {
+            border-color: var(--accent);
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        .btn-cancel {
+            font-family: var(--mono);
+            font-size: 10px;
+            letter-spacing: .06em;
+            text-transform: uppercase;
+            padding: 6px 14px;
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--muted);
+            cursor: pointer;
+        }
+
+        .btn-generate {
+            font-family: var(--mono);
+            font-size: 10px;
+            letter-spacing: .06em;
+            text-transform: uppercase;
+            padding: 6px 14px;
+            border-radius: var(--radius);
+            border: 1px solid rgba(0, 229, 255, .35);
+            background: rgba(0, 229, 255, .08);
+            color: var(--accent);
+            cursor: pointer;
+        }
+
+        .btn-generate:disabled {
+            opacity: .4;
+            cursor: not-allowed;
+        }
+
+        .modal-result {
+            font-size: 10px;
+            margin-top: 14px;
+        }
+
+        .modal-result.ok {
+            color: var(--ok);
+        }
+
+        .modal-result.fail {
+            color: var(--accent2);
+        }
+
+        .conn-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--muted);
+            transition: background .3s, box-shadow .3s;
+        }
+
+        .conn-dot.live {
+            background: var(--ok);
+            box-shadow: 0 0 8px var(--ok)
+        }
+
+        .conn-dot.dead {
+            background: var(--accent2)
+        }
+
+        main {
+            padding: 24px 32px;
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+
+        .section-head {
+            font-family: var(--mono);
+            font-size: 10px;
+            letter-spacing: .12em;
+            text-transform: uppercase;
+            color: var(--muted);
+            margin-bottom: 14px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .section-head::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: var(--border);
+        }
+
+        #active-section {
+            margin-bottom: 32px
+        }
+
+        #active-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px
+        }
+
+        .track-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 14px 16px;
+            display: grid;
+            grid-template-columns: 1fr auto;
+            align-items: center;
+            gap: 12px;
+            position: relative;
+            overflow: hidden;
+            animation: slideIn .25s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-8px)
+            }
+
+            to {
+                opacity: 1;
+                transform: none
+            }
+        }
+
+        .track-card.downloading::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 3px;
+            background: linear-gradient(180deg, var(--accent), var(--accent2));
+            animation: borderPulse 2s ease-in-out infinite;
+        }
+
+        @keyframes borderPulse {
+
+            0%,
+            100% {
+                opacity: .4
+            }
+
+            50% {
+                opacity: 1
+            }
+        }
+
+        .track-card.queued::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 3px;
+            background: var(--warn);
+            opacity: .6;
+        }
+
+        .track-card.done::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 3px;
+            background: var(--ok);
+        }
+
+        .track-card.failed::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 3px;
+            background: var(--accent2);
+        }
+
+        .track-info {
+            overflow: hidden
+        }
+
+        .track-title {
+            font-size: 15px;
+            font-weight: 700;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-bottom: 3px;
+        }
+
+        .track-artist {
+            font-family: var(--mono);
+            font-size: 11px;
+            color: var(--muted)
+        }
+
+        .track-url {
+            font-family: var(--mono);
+            font-size: 10px;
+            color: var(--accent);
+            opacity: .7;
+            margin-top: 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .track-meta {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-shrink: 0
+        }
+
+        .badge {
+            font-family: var(--mono);
+            font-size: 9px;
+            font-weight: 500;
+            letter-spacing: .06em;
+            text-transform: uppercase;
+            padding: 3px 8px;
+            border-radius: 4px;
+        }
+
+        .badge.downloading {
+            background: rgba(0, 229, 255, .12);
+            color: var(--accent);
+            border: 1px solid rgba(0, 229, 255, .3)
+        }
+
+        .badge.queued {
+            background: rgba(255, 171, 64, .12);
+            color: var(--warn);
+            border: 1px solid rgba(255, 171, 64, .3)
+        }
+
+        .badge.done {
+            background: rgba(105, 255, 154, .12);
+            color: var(--ok);
+            border: 1px solid rgba(105, 255, 154, .3)
+        }
+
+        .badge.failed {
+            background: rgba(255, 64, 129, .12);
+            color: var(--accent2);
+            border: 1px solid rgba(255, 64, 129, .3)
+        }
+
+        .badge.skipped {
+            background: rgba(74, 96, 112, .12);
+            color: var(--muted);
+            border: 1px solid var(--border)
+        }
+
+        .spinner {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            border: 2px solid rgba(0, 229, 255, .2);
+            border-top-color: var(--accent);
+            animation: spin .7s linear infinite;
+            display: inline-block;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg)
+            }
+        }
+
+        .log-toggle {
+            font-family: var(--mono);
+            font-size: 9px;
+            color: var(--muted);
+            cursor: pointer;
+            text-decoration: underline;
+            margin-top: 5px;
+            display: inline-block;
+            background: none;
+            border: none;
+            padding: 0;
+        }
+
+        .log-box {
+            display: none;
+            background: #04070a;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 8px;
+            margin-top: 6px;
+            font-family: var(--mono);
+            font-size: 10px;
+            color: var(--muted);
+            max-height: 120px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+            grid-column: 1 / -1;
+        }
+
+        .log-box.open {
+            display: block
+        }
+
+        #history-table {
+            width: 100%;
+            border-collapse: collapse
+        }
+
+        #history-table th {
+            font-family: var(--mono);
+            font-size: 9px;
+            letter-spacing: .1em;
+            text-transform: uppercase;
+            color: var(--muted);
+            text-align: left;
+            padding: 6px 10px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        #history-table td {
+            padding: 9px 10px;
+            border-bottom: 1px solid rgba(28, 37, 48, .6);
+            font-size: 13px;
+            vertical-align: middle;
+        }
+
+        #history-table tr:last-child td {
+            border-bottom: none
+        }
+
+        #history-table tr:hover td {
+            background: rgba(14, 19, 24, .6)
+        }
+
+        .td-mono {
+            font-family: var(--mono);
+            font-size: 11px
+        }
+
+        .td-url {
+            color: inherit;
+            text-decoration: none;
+            display: inline-block;
+            font-family: var(--mono);
+            color: var(--accent);
+            opacity: .7;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .td-time {
+            font-family: var(--mono);
+            font-size: 10px;
+            color: var(--muted);
+            white-space: nowrap
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 48px 0;
+            color: var(--muted);
+            font-family: var(--mono);
+            font-size: 12px;
+        }
+
+        .empty-state .icon {
+            font-size: 36px;
+            margin-bottom: 12px;
+            opacity: .4
+        }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <div class="left-cluster">
+            <div class="conn-pill">
+                <div class="conn-dot" id="conn-dot"></div>
+                <span id="conn-label">connecting</span>
+            </div>
+            <button class="btn-register" id="btn-open-register">
+                <svg width="11" height="11" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="1" y="1" width="4" height="4" rx="1" stroke="currentColor" stroke-width="1.2" />
+                    <rect x="7" y="1" width="4" height="4" rx="1" stroke="currentColor" stroke-width="1.2" />
+                    <rect x="1" y="7" width="4" height="4" rx="1" stroke="currentColor" stroke-width="1.2" />
+                    <path d="M9 7v4M7 9h4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" />
+                </svg>
+                Generate registration
+            </button>
+        </div>
+        <div class="stats">
+            <div>
+                <div class="stat-val accent" id="s-active">0</div>
+                <div class="stat-lbl">active</div>
+            </div>
+            <div>
+                <div class="stat-val ok" id="s-done">0</div>
+                <div class="stat-lbl">done</div>
+            </div>
+            <div>
+                <div class="stat-val warn" id="s-queued">0</div>
+                <div class="stat-lbl">queued</div>
+            </div>
+            <div>
+                <div class="stat-val err" id="s-failed">0</div>
+                <div class="stat-lbl">failed</div>
+            </div>
+        </div>
+    </header>
+
+    <div class="modal-overlay" id="register-modal">
+        <div class="modal">
+            <h3>Generate registration link</h3>
+            <label for="owner-name">Owner name</label>
+            <input type="text" id="owner-name" placeholder="e.g. alice" autocomplete="off" />
+            <label for="admin-key">Admin Key</label>
+            <input type="password" id="admin-key" placeholder="administrator key (found in log)" autocomplete="off" />
+            <div class="modal-actions">
+                <button focus class="btn-generate" id="btn-generate">Generate &amp; copy</button>
+                <button class="btn-cancel" id="btn-cancel">Cancel</button>
+            </div>
+            <div class="modal-result" id="modal-result"></div>
+        </div>
+    </div>
+
+    <main>
+        <div id="active-section">
+            <div class="section-head">Active</div>
+            <div id="active-list"></div>
+        </div>
+
+        <div id="history-section">
+            <div class="section-head">Recent History</div>
+            <table id="history-table">
+                <thead>
+                    <tr>
+                        <th>Title</th>
+                        <th>Artist</th>
+                        <th>Status</th>
+                        <th>URL</th>
+                        <th>Added</th>
+                    </tr>
+                </thead>
+                <tbody id="history-body"></tbody>
+            </table>
+        </div>
+    </main>
+
+    <script>
+        // ── Helpers ────────────────────────────────────────────────────
+
+        /** Create an element, set className, and optionally set textContent. */
+        function element(tag, className, text) {
+            const e = document.createElement(tag);
+            if (className) e.className = className;
+            if (text !== undefined) e.textContent = text;
+            return e;
+        }
+
+        function makeBadge(status) {
+            return element('span', `badge ${status}`, status);
+        }
+
+        function timeAgo(d) {
+            const s = Math.floor((Date.now() - d) / 1000);
+            if (s < 60) return s + 's ago';
+            if (s < 3600) return Math.floor(s / 60) + 'm ago';
+            if (s < 86400) return Math.floor(s / 3600) + 'h ago';
+            return d.toLocaleDateString();
+        }
+
+        // ── State ──────────────────────────────────────────────────────
+
+        const tracks = {}; // id → track
+
+        function upsert(t) {
+            tracks[t.id] = t;
+            render();
+        }
+
+        // ── DOM builders ───────────────────────────────────────────────
+
+        /**
+         * Build a track card entirely with DOM APIs — no innerHTML, no string concat.
+         * User-supplied strings only ever land in textContent or as attribute values
+         * on trusted attributes (title), never as raw HTML.
+         */
+        function buildTrackCard(t) {
+            const card = element('div', `track-card ${t.status}`);
+            card.id = `card-${t.id}`;
+
+            // ── left column: info ──────────────────────────────────────
+            const info = element('div', 'track-info');
+
+            const title = element('div', 'track-title', t.title || t.video_id || 'Unknown');
+            const artist = element('div', 'track-artist', t.artist || '—');
+
+            const url = document.createElement("a");
+            url.href = "https://music.youtube.com/watch?v="+t.video_id
+            url.textContent = "https://music.youtube.com/watch?v="+t.video_id
+            url.className = "track-url"
+
+            info.append(title, artist, url);
+
+            // optional expandable log
+            if (t.log && t.log.trim()) {
+                const logId = `log-${t.id}`;
+
+                const toggle = element('button', 'log-toggle', 'show log');
+                toggle.type = 'button';
+                toggle.setAttribute('aria-expanded', 'false');
+                toggle.setAttribute('aria-controls', logId);
+                toggle.addEventListener('click', () => {
+                    const box = document.getElementById(logId);
+                    const open = box.classList.toggle('open');
+                    toggle.textContent = open ? 'hide log' : 'show log';
+                    toggle.setAttribute('aria-expanded', String(open));
+                });
+
+                const logBox = element('div', 'log-box', t.log);
+                logBox.id = logId;
+
+                info.append(toggle, logBox);
+            }
+
+            // ── right column: meta ─────────────────────────────────────
+            const meta = element('div', 'track-meta');
+
+            if (t.status === 'downloading') {
+                const spinner = element('span', 'spinner');
+                spinner.setAttribute('aria-hidden', 'true');
+                meta.append(spinner);
+            }
+
+            meta.append(makeBadge(t.status));
+
+            card.append(info, meta);
+            return card;
+        }
+
+        /**
+         * Build a history <tr> using DOM APIs.
+         */
+        function buildHistoryRow(t) {
+            const tr = document.createElement('tr');
+
+            const tdTitle = element('td', null, t.title || t.video_id || '—');
+            const tdArtist = element('td', 'td-mono', t.artist || '—');
+
+            const tdStatus = document.createElement('td');
+            tdStatus.append(makeBadge(t.status));
+
+        
+            const tdUrl = element('td');
+            tdUrl.title = "https://music.youtube.com/watch?v="+t.video_id;
+
+            const url = document.createElement("a");
+            url.href = "https://music.youtube.com/watch?v="+t.video_id
+            url.textContent = "https://music.youtube.com/watch?v="+t.video_id
+            url.target = "_blank"
+            url.className = "td td-url"
+
+            tdUrl.append(url)
+
+            const tdTime = element('td', 'td-time', timeAgo(new Date(t.created_at)));
+
+            tr.append(tdTitle, tdArtist, tdStatus, tdUrl, tdTime);
+            return tr;
+        }
+
+        // ── Render ─────────────────────────────────────────────────────
+
+        function buildEmptyState(icon, message) {
+            const wrap = element('div', 'empty-state');
+            const ico = element('div', 'icon', icon);
+            wrap.append(ico, document.createTextNode(message));
+            return wrap;
+        }
+
+        function render() {
+            const all = Object.values(tracks).sort(
+                (a, b) => new Date(b.created_at) - new Date(a.created_at)
+            );
+
+            const active = all.filter(t => t.status === 'downloading' || t.status === 'queued');
+            const history = all.filter(t => t.status === 'done' || t.status === 'failed' || t.status === 'skipped');
+
+            // Stats
+            document.getElementById('s-active').textContent = active.filter(t => t.status === 'downloading').length;
+            document.getElementById('s-queued').textContent = active.filter(t => t.status === 'queued').length;
+            document.getElementById('s-done').textContent = all.filter(t => t.status === 'done').length;
+            document.getElementById('s-failed').textContent = all.filter(t => t.status === 'failed').length;
+
+            // Active cards
+            const activeEl = document.getElementById('active-list');
+            activeEl.replaceChildren(
+                ...(active.length === 0
+                    ? [buildEmptyState('🎵', 'No active downloads')]
+                    : active.map(buildTrackCard))
+            );
+
+            // History rows
+            const tbody = document.getElementById('history-body');
+            if (history.length === 0) {
+                const tr = document.createElement('tr');
+                const td = document.createElement('td');
+                td.colSpan = 5;
+                td.append(buildEmptyState('', 'No history yet'));
+                tr.append(td);
+                tbody.replaceChildren(tr);
+            } else {
+                tbody.replaceChildren(...history.map(buildHistoryRow));
+            }
+        }
+
+        // ── SSE ────────────────────────────────────────────────────────
+
+        let es;
+        function connect() {
+            es = new EventSource('/events');
+
+            es.onopen = () => {
+                document.getElementById('conn-dot').className = 'conn-dot live';
+                document.getElementById('conn-label').textContent = 'live';
+            };
+
+            es.onerror = () => {
+                document.getElementById('conn-dot').className = 'conn-dot dead';
+                document.getElementById('conn-label').textContent = 'reconnecting';
+                setTimeout(connect, 3000);
+            };
+
+            es.onmessage = e => {
+                // JSON.parse is safe here; the resulting object properties are only
+                // ever assigned to textContent / attributes, never innerHTML.
+                const t = JSON.parse(e.data);
+                upsert(t);
+            };
+        }
+
+        // model
+        const openBtn = document.getElementById('btn-open-register');
+        const modal = document.getElementById('register-modal');
+        const cancelBtn = document.getElementById('btn-cancel');
+        const genBtn = document.getElementById('btn-generate');
+        const nameInput = document.getElementById('owner-name');
+        const adminKeyInput = document.getElementById('admin-key')
+        const result = document.getElementById('modal-result');
+
+        openBtn.addEventListener('click', () => {
+            modal.classList.add('open');
+            nameInput.value = '';
+            adminKeyInput.value = ''
+            result.textContent = '';
+            nameInput.focus();
+        });
+        cancelBtn.addEventListener('click', () => modal.classList.remove('open'));
+        modal.addEventListener('click', e => { if (e.target === modal) modal.classList.remove('open'); });
+
+        genBtn.addEventListener('click', async () => {
+            const name = nameInput.value.trim();
+            const key = adminKeyInput.value.trim();
+
+            if (!name) { result.textContent = 'Owner name is required.'; result.className = 'modal-result fail'; return; }
+            if (!key) { result.textContent = 'Administrator key is required.'; result.className = 'modal-result fail'; return; }
+
+            genBtn.disabled = true;
+            result.textContent = '';
+            try {
+                const res = await fetch('/api/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, key })
+                });
+                if (!res.ok) throw new Error(`Server error ${res.status}`);
+                const { url } = await res.json();
+                await navigator.clipboard.writeText(url);
+                result.textContent = '✓ Copied to clipboard!';
+                result.className = 'modal-result ok';
+            } catch (err) {
+                result.textContent = '✗ ' + err.message;
+                result.className = 'modal-result fail';
+            } finally {
+                genBtn.disabled = false;
+            }
+        });
+
+        // ── Init ────────────────────────────────────────────────────────
+
+        async function init() {
+            const res = await fetch('/api/tracks');
+            const list = await res.json();
+            list.forEach(t => { tracks[t.id] = t; });
+            render();
+            connect();
+
+            // Refresh time-ago labels every minute
+            setInterval(render, 60_000);
+        }
+
+
+
+        init();
+    </script>
+</body>
+
+</html>
