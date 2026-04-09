@@ -8,6 +8,12 @@ In essence it is a wrapper around the `yt-dlp` command line tool, but enables yo
 The extension (https://github.com/NHAS/tracker-extension) built for firefox, loads some JS into the `http://music.youtube.com` to watch the player and record the video id of the current song, sending it off to the api for recording. 
 
 
+## Warning
+
+This is a personal project. Unlike my other repos such as `reverse_ssh` and `wag` the amount of support and cleaniliness of this project is likely to be minimal. 
+
+Bear that in mind when opening issues and requesting features please. 
+
 ## Docker compose
 
 ```yml
