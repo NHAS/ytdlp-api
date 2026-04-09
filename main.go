@@ -572,9 +572,16 @@ func main() {
 	mux.HandleFunc("GET /api/tracks", srv.handleTracks)
 	mux.HandleFunc("POST /api/register", srv.handleRegister)
 	mux.HandleFunc("/events", srv.handleSSE)
+	server := &http.Server{
+		Addr:         Config.Addr,
+		Handler:      http.MaxBytesHandler(mux, 1024*1024),
+		ReadTimeout:  5 * time.Second,   // Max time to read the request
+		WriteTimeout: 10 * time.Second,  // Max time to write the response
+		IdleTimeout:  120 * time.Second, // Max time for keep-alive connections
+	}
 
 	log.Printf("ytdl-server listening on %s  |  Downloads path → %q", Config.Addr, Config.DownloadsPath)
-	if err := http.ListenAndServe(Config.Addr, mux); err != nil {
+	if err := server.ListenAndServe(); err != nil {
 		log.Fatal(err)
 	}
 }
