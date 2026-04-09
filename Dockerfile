@@ -1,7 +1,7 @@
 # ─────────────────────────────────────────────
 # Stage 1: Build the Go binary
 # ─────────────────────────────────────────────
-FROM golang:1.26 AS builde
+FROM golang:1.26 AS builder
 
 WORKDIR /app
 
