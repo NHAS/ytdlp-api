@@ -539,7 +539,7 @@ func mustMigrateDB(db *sql.DB) {
 
 func main() {
 
-	configPath := getEnv("CONFIG_PATH", "config.json")
+	configPath := getEnv("CONFIG_PATH", "/data/config.json")
 	if err := Load(configPath); err != nil {
 		log.Fatalf("failed to load configuration file %q: %v", configPath, err)
 	}

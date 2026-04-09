@@ -46,11 +46,11 @@ func Load(path string) error {
 	}
 
 	if Config.DownloadsPath == "" {
-		Config.DownloadsPath = "downloads"
+		Config.DownloadsPath = "/downloads"
 	}
 
 	if Config.DBPath == "" {
-		Config.DBPath = "ytdl.db"
+		Config.DBPath = "/data/ytdl.db"
 	}
 
 	if Config.DownloadTimeout == 0 {

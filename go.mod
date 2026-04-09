@@ -1,4 +1,4 @@
-module youtubedl-server
+module github.com/NHAS/ytdlp-api
 
 go 1.25.8
 
