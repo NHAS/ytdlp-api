@@ -183,7 +183,7 @@ func (s *Server) download(t Track) {
 
 	outTemplate := filepath.Join(s.outDir, time.Now().Format(time.DateOnly), cleanedPath)
 
-	u, err := url.Parse("https://music.youtube.com")
+	u, err := url.Parse("https://music.youtube.com/watch")
 	if err != nil {
 		log.Println("failed to parse url: ", err)
 		t.Status = StatusFailed
