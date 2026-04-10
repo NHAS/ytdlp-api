@@ -28,7 +28,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         atomicparsley \
         ca-certificates \
         curl \
-        npm \
+        unzip \
         yt-dlp \
     && rm -rf /var/lib/apt/lists/*
 
