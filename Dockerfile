@@ -16,7 +16,7 @@ RUN CGO_ENABLED=1 GOOS=linux \
 # ─────────────────────────────────────────────
 # Stage 2: Runtime
 # ─────────────────────────────────────────────
-FROM debian:bookworm-slim
+FROM debian:sid-slim
 
 # yt-dlp needs Python, ffmpeg (for audio extraction + muxing),
 # and AtomicParsley (for embedding thumbnails into m4a/mp4).
@@ -28,18 +28,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         atomicparsley \
         ca-certificates \
         curl \
+        npm \
+        yt-dlp \
     && rm -rf /var/lib/apt/lists/*
 
-# Install yt-dlp from the official release binary rather than
-# the distro package so we always get a recent version.
-RUN curl -fsSL \
-        "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp" \
-        -o /usr/local/bin/yt-dlp \
-    && chmod +x /usr/local/bin/yt-dlp
-
-# go-sqlite3 is a CGo package, so the binary is dynamically linked.
-# Pull in the C runtime libraries it needs.
-RUN apt-get update && apt-get install -y --no-install-recommends && rm -rf /var/lib/apt/lists/*
+# Ignore deno on arm, as its not supported linux + arm, but windows is? thanks society
+RUN if [ "$TARGETARCH" != "arm64" ]; then \
+        curl -fsSL https://deno.land/install.sh -o install.sh && \
+        chmod +X install.sh && \
+        DENO_INSTALL="/usr" ./install.sh -y && \
+        rm install.sh \
+    fi
 
 WORKDIR /app
 
