@@ -19,7 +19,7 @@ Bear that in mind when opening issues and requesting features please.
 ```yml
 services:
   ytdl-server:
-    image: ghcr.io/NHAS/ytdlp-api:latest
+    image: ghcr.io/nhas/ytdlp-api:latest
     restart: unless-stopped
     ports:
       - "8080:8080"
