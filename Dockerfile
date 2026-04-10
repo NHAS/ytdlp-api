@@ -28,14 +28,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         atomicparsley \
         ca-certificates \
         curl \
-        unzip \
         yt-dlp \
     && rm -rf /var/lib/apt/lists/*
 
-RUN curl -fsSL https://deno.land/install.sh -o install.sh && \
-    chmod +x install.sh && \
-    DENO_INSTALL="/usr" ./install.sh -y && \
-    rm install.sh 
 
 WORKDIR /app
 

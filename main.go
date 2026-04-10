@@ -16,7 +16,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -207,11 +206,6 @@ func (s *Server) download(t Track) {
 		"-f", "bestaudio",
 		"-o", outTemplate,
 		u.String(),
-	}
-
-	if !Config.Debug && runtime.GOARCH != "arm" {
-		// dont pull random scripts from github and run them if we're doing this locally
-		arguments = append([]string{"--remote-components", "ejs:github"}, arguments...)
 	}
 
 	cmd := exec.CommandContext(ctx, "yt-dlp", arguments...)
