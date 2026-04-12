@@ -480,16 +480,23 @@ func (s *Server) handleSSE(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 	for {
+		var err error
 		select {
 		case <-ctx.Done():
 			return
 		case msg := <-ch:
-			w.Write(msg)
-			flusher.Flush()
+			_, err = w.Write(msg)
+
 		case <-ticker.C:
-			fmt.Fprintf(w, ": keepalive\n\n")
-			flusher.Flush()
+			_, err = fmt.Fprintf(w, ": keepalive\n\n")
 		}
+
+		if err != nil {
+			log.Println("client disconnected: ", err)
+			return
+		}
+
+		flusher.Flush()
 	}
 }
 
