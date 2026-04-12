@@ -7,6 +7,7 @@ import (
 	"crypto/subtle"
 	"database/sql"
 	_ "embed"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -42,6 +43,7 @@ const (
 
 type Track struct {
 	ID        int64     `json:"id"`
+	Owner     string    `json:"-"`
 	VideoID   string    `json:"video_id"`
 	Title     string    `json:"title"`
 	Artist    string    `json:"artist"`
@@ -49,6 +51,23 @@ type Track struct {
 	Log       string    `json:"log"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
+}
+
+func (t *Track) Sanitise() error {
+	t.Artist = santise(t.Artist)
+	t.Title = santise(t.Title)
+	t.Owner = ownerSantise(t.Owner)
+
+	if len(t.VideoID) != 11 {
+		return fmt.Errorf("video id is not the correct length, was %d, should be 11", len(t.VideoID))
+	}
+
+	_, err := base64.RawStdEncoding.DecodeString(t.VideoID)
+	if err != nil {
+		return fmt.Errorf("video id was not base64")
+	}
+
+	return nil
 }
 
 // ─────────────────────────────────────────────
@@ -116,11 +135,16 @@ func (s *Server) findByVideoID(videoID string) (*Track, error) {
 	return scanTrack(row)
 }
 
-func (s *Server) insertTrack(t *Track, owner string) (int64, error) {
+func (s *Server) insertTrack(t *Track) (int64, error) {
+
+	if err := t.Sanitise(); err != nil {
+		return 0, err
+	}
+
 	res, err := s.db.Exec(
 		`INSERT INTO tracks (video_id, title, artist, status, log, owner, created_at, updated_at)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		t.VideoID, t.Title, t.Artist, t.Status, t.Log, owner,
+		t.VideoID, t.Title, t.Artist, t.Status, t.Log, t.Owner,
 		t.CreatedAt.Format(time.RFC3339Nano), t.UpdatedAt.Format(time.RFC3339Nano))
 	if err != nil {
 		return 0, err
@@ -174,7 +198,13 @@ func scanTrack(s scanner) (*Track, error) {
 // Download worker
 // ─────────────────────────────────────────────
 
-func (s *Server) download(t Track) {
+func (s *Server) download(t *Track) {
+	if err := t.Sanitise(); err != nil {
+		s.updateStatus(t.ID, StatusDownloading, "failed to santise track")
+		t.Status = StatusFailed
+		return
+	}
+
 	s.updateStatus(t.ID, StatusDownloading, "starting download...")
 	t.Status = StatusDownloading
 	s.broker.Publish(t)
@@ -204,6 +234,7 @@ func (s *Server) download(t Track) {
 		"--add-metadata",
 		"-x", "--audio-format", "opus",
 		"-f", "bestaudio",
+		"--postprocessor-args", fmt.Sprintf("ffmpeg:-metadata owner=%s", ownerSantise(t.Owner)),
 		"-o", outTemplate,
 		u.String(),
 	}
@@ -308,7 +339,7 @@ func (s *Server) handleDownload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	now := time.Now().UTC()
-	t := Track{
+	t := &Track{
 		VideoID:   body.VideoID,
 		Title:     body.Title,
 		Artist:    body.Artist,
@@ -316,9 +347,10 @@ func (s *Server) handleDownload(w http.ResponseWriter, r *http.Request) {
 		Log:       "",
 		CreatedAt: now,
 		UpdatedAt: now,
+		Owner:     owner,
 	}
 
-	id, err := s.insertTrack(&t, owner)
+	id, err := s.insertTrack(t)
 	if err != nil {
 		http.Error(w, "db error: "+err.Error(), http.StatusInternalServerError)
 		log.Println("failed to insert track: ", err)
@@ -373,6 +405,8 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 		log.Println("Client sent a request with an invalid admin key")
 		return
 	}
+
+	reg.Name = ownerSantise(reg.Name)
 
 	buff := make([]byte, 16)
 	_, err := rand.Read(buff)
