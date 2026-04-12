@@ -62,7 +62,7 @@ func (t *Track) Sanitise() error {
 		return fmt.Errorf("video id is not the correct length, was %d, should be 11", len(t.VideoID))
 	}
 
-	_, err := base64.URLEncoding.DecodeString(t.VideoID)
+	_, err := base64.RawURLEncoding.DecodeString(t.VideoID)
 	if err != nil {
 		return fmt.Errorf("video id was not base64")
 	}
