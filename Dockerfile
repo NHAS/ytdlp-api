@@ -35,10 +35,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 COPY --from=builder /app/ytdl-server ./ytdl-server
+COPY entry.sh .
+RUN chmod +x entry.sh
 
 # Sensible defaults — all overridable via config.json or env vars
 ENV CONFIG_PATH=/app/config.json
 
 VOLUME ["/downloads", "/data"]
 
-ENTRYPOINT ["./entry.sh"]
+ENTRYPOINT ["/app/entry.sh"]
