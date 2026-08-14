@@ -16,7 +16,7 @@ RUN CGO_ENABLED=1 GOOS=linux \
 # ─────────────────────────────────────────────
 # Stage 2: Runtime
 # ─────────────────────────────────────────────
-FROM debian:sid-slim
+FROM debian:trixie-slim
 
 # yt-dlp needs Python, ffmpeg (for audio extraction + muxing),
 # and AtomicParsley (for embedding thumbnails into m4a/mp4).
@@ -24,11 +24,11 @@ FROM debian:sid-slim
 # without it --embed-thumbnail silently skips on non-mkv containers.
 RUN apt-get update && apt-get install -y --no-install-recommends \
         python3 \
+        python3-pip \
         ffmpeg \
         atomicparsley \
         ca-certificates \
         curl \
-        yt-dlp \
     && rm -rf /var/lib/apt/lists/*
 
 
@@ -41,4 +41,4 @@ ENV CONFIG_PATH=/app/config.json
 
 VOLUME ["/downloads", "/data"]
 
-ENTRYPOINT ["./ytdl-server"]
+ENTRYPOINT ["./entry.sh"]

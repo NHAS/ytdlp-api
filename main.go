@@ -10,6 +10,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -136,20 +137,35 @@ func (s *Server) findByVideoID(videoID string) (*Track, error) {
 }
 
 func (s *Server) insertTrack(t *Track) (int64, error) {
-
 	if err := t.Sanitise(); err != nil {
 		return 0, err
 	}
 
-	res, err := s.db.Exec(
+	var id int64
+	err := s.db.QueryRow(
 		`INSERT INTO tracks (video_id, title, artist, status, log, owner, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(video_id) DO UPDATE SET
+             status     = excluded.status,
+             log        = excluded.log,
+             owner      = excluded.owner,
+             updated_at = excluded.updated_at
+         	WHERE tracks.status = 'failed'
+		 RETURNING id`,
 		t.VideoID, t.Title, t.Artist, t.Status, t.Log, t.Owner,
-		t.CreatedAt.Format(time.RFC3339Nano), t.UpdatedAt.Format(time.RFC3339Nano))
-	if err != nil {
+		t.CreatedAt.Format(time.RFC3339Nano), t.UpdatedAt.Format(time.RFC3339Nano)).Scan(&id)
+
+	switch {
+	case err == nil:
+		// fresh insert OR the conditional update fired — either way we got the id back
+		return id, nil
+	case errors.Is(err, sql.ErrNoRows):
+		// row exists but status wasn't 'failed', so neither insert nor update happened
+		err = s.db.QueryRow(`SELECT id FROM tracks WHERE video_id = ?`, t.VideoID).Scan(&id)
+		return id, err
+	default:
 		return 0, err
 	}
-	return res.LastInsertId()
 }
 
 func (s *Server) updateStatus(id int64, status Status, logMsg string) {
