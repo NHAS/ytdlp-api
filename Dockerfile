@@ -36,7 +36,7 @@ WORKDIR /app
 
 COPY --from=builder /app/ytdl-server ./ytdl-server
 COPY entry.sh .
-RUN chmod +x entry.sh
+RUN chmod +x entry.sh && chmod 777 /usr/local/bin
 
 # Sensible defaults — all overridable via config.json or env vars
 ENV CONFIG_PATH=/app/config.json
