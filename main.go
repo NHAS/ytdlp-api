@@ -242,23 +242,34 @@ func (s *Server) download(t *Track) {
 
 	u.RawQuery = q.Encode()
 
-	ctx, cancel := context.WithTimeout(context.Background(), Config.DownloadTimeout)
+	var out []byte
 
-	arguments := []string{
-		"--no-playlist",
-		"--embed-thumbnail",
-		"--add-metadata",
-		"-x", "--audio-format", "opus",
-		"-f", "bestaudio",
-		"--postprocessor-args", fmt.Sprintf("ffmpeg:-metadata owner=%s", ownerSantise(t.Owner)),
-		"-o", outTemplate,
-		u.String(),
+	for i := 0; i < 5; i++ {
+		ctx, cancel := context.WithTimeout(context.Background(), Config.DownloadTimeout)
+
+		arguments := []string{
+			"--no-playlist",
+			"--embed-thumbnail",
+			"--add-metadata",
+			"-x", "--audio-format", "opus",
+			"-f", "bestaudio",
+			"--postprocessor-args", fmt.Sprintf("ffmpeg:-metadata owner=%s", ownerSantise(t.Owner)),
+			"-o", outTemplate,
+			u.String(),
+		}
+
+		cmd := exec.CommandContext(ctx, "/usr/local/bin/yt-dlp", arguments...)
+
+		out, err = cmd.CombinedOutput()
+		cancel()
+
+		if err == nil {
+			break
+		}
+
+		time.Sleep(20 * time.Second)
+		log.Printf("[FAIL %d/5] %s: %v:\n%s", i, t.VideoID, err, out)
 	}
-
-	cmd := exec.CommandContext(ctx, "/usr/local/bin/yt-dlp", arguments...)
-
-	out, err := cmd.CombinedOutput()
-	cancel()
 
 	logStr := strings.TrimSpace(string(out))
 
