@@ -13,6 +13,10 @@ RUN CGO_ENABLED=1 GOOS=linux \
     go build -ldflags="-s -w" -o ytdl-server .
 
 
+
+FROM denoland/deno:bin-2.9.5 as deno 
+
+
 # ─────────────────────────────────────────────
 # Stage 2: Runtime
 # ─────────────────────────────────────────────
@@ -32,6 +36,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         curl \
     && rm -rf /var/lib/apt/lists/*
 
+COPY --from=deno /deno /usr/local/bin/deno
 
 WORKDIR /app
 
