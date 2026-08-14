@@ -255,7 +255,7 @@ func (s *Server) download(t *Track) {
 		u.String(),
 	}
 
-	cmd := exec.CommandContext(ctx, "yt-dlp", arguments...)
+	cmd := exec.CommandContext(ctx, "/usr/local/bin/yt-dlp", arguments...)
 
 	out, err := cmd.CombinedOutput()
 	cancel()
@@ -633,6 +633,8 @@ func main() {
 		log.Fatalf("failed to load configuration file %q: %v", configPath, err)
 	}
 
+	go updateYtdlp()
+
 	log.Printf("Loaded configuration: %#v", Config)
 
 	if err := os.MkdirAll(Config.DownloadsPath, 0750); err != nil {
@@ -681,4 +683,11 @@ func getEnv(key, def string) string {
 	}
 
 	return def
+}
+
+func updateYtdlp() {
+	for {
+		exec.Command("/usr/local/bin/yt-dlp", "-U")
+		time.Sleep(24 * time.Hour)
+	}
 }
