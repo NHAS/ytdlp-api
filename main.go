@@ -180,21 +180,16 @@ type Stats struct {
 }
 
 func (s *Server) countracks() (Stats, error) {
-	rows, err := s.db.Query(
+	row := s.db.QueryRow(
 		`SELECT
 			COUNT(CASE WHEN status = 'done' THEN 1 END) AS done_count,
 			COUNT(CASE WHEN status = 'pending' THEN 1 END) AS pending_count, 
 			COUNT(CASE WHEN status = 'failed' THEN 1 END) AS failed_count,
 			COUNT(CASE WHEN status = 'downloading' THEN 1 END) AS downloading_count
 		FROM tracks;`)
-	if err != nil {
-		return Stats{}, err
-	}
-
-	defer rows.Close()
 
 	var stat Stats
-	err = rows.Scan(
+	err := row.Scan(
 		&stat.Done, &stat.Pending, &stat.Failed, &stat.Downloading)
 	if err != nil {
 		return stat, err
