@@ -1024,21 +1024,17 @@
             stats = await statsRes.json();
         }
 
-        async function init() {
+        async function update() {
             await loadPage(currentFrom);
             await refreshStats();
+            render();
 
             // Poll the current page + stats every 30s, preserving whatever
             // page the user is currently looking at.
-            setInterval(async () => {
-                await loadPage(currentFrom);
-                await refreshStats();
-
-                render();
-            }, 30_000);
+            setInterval(update, 30_000);
         }
 
-        init();
+        update();
     </script>
 </body>
 
