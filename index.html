@@ -150,6 +150,37 @@
             transform: scale(.98);
         }
 
+        .btn-retry {
+            font-family: var(--mono);
+            font-size: 10px;
+            letter-spacing: .06em;
+            text-transform: uppercase;
+            padding: 6px 14px;
+            border-radius: var(--radius);
+            border: 1px solid rgba(255, 171, 64, .35);
+            background: rgba(255, 171, 64, .08);
+            color: var(--warn);
+            cursor: pointer;
+            transition: background .2s, border-color .2s;
+            display: flex;
+            align-items: center;
+            gap: 7px;
+        }
+
+        .btn-retry:hover:not(:disabled) {
+            background: rgba(255, 171, 64, .15);
+            border-color: rgba(255, 171, 64, .6);
+        }
+
+        .btn-retry:active:not(:disabled) {
+            transform: scale(.98);
+        }
+
+        .btn-retry:disabled {
+            opacity: .45;
+            cursor: not-allowed;
+        }
+
         .modal-overlay {
             display: none;
             position: fixed;
@@ -255,23 +286,6 @@
 
         .modal-result.fail {
             color: var(--accent2);
-        }
-
-        .conn-dot {
-            width: 7px;
-            height: 7px;
-            border-radius: 50%;
-            background: var(--muted);
-            transition: background .3s, box-shadow .3s;
-        }
-
-        .conn-dot.live {
-            background: var(--ok);
-            box-shadow: 0 0 8px var(--ok)
-        }
-
-        .conn-dot.dead {
-            background: var(--accent2)
         }
 
         main {
@@ -460,12 +474,6 @@
             border: 1px solid rgba(255, 64, 129, .3)
         }
 
-        .badge.skipped {
-            background: rgba(74, 96, 112, .12);
-            color: var(--muted);
-            border: 1px solid var(--border)
-        }
-
         .spinner {
             width: 14px;
             height: 14px;
@@ -584,6 +592,48 @@
             margin-bottom: 12px;
             opacity: .4
         }
+
+        .pager {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            margin-top: 24px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border);
+        }
+
+        .btn-page {
+            font-family: var(--mono);
+            font-size: 10px;
+            letter-spacing: .06em;
+            text-transform: uppercase;
+            padding: 7px 16px;
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            background: var(--card);
+            color: var(--txt);
+            cursor: pointer;
+            transition: border-color .2s, color .2s;
+        }
+
+        .btn-page:hover:not(:disabled) {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .btn-page:disabled {
+            opacity: .35;
+            cursor: not-allowed;
+        }
+
+        .pager-label {
+            font-family: var(--mono);
+            font-size: 10px;
+            color: var(--muted);
+            min-width: 70px;
+            text-align: center;
+        }
     </style>
 </head>
 
@@ -591,10 +641,6 @@
 
     <header>
         <div class="left-cluster">
-            <div class="conn-pill">
-                <div class="conn-dot" id="conn-dot"></div>
-                <span id="conn-label">connecting</span>
-            </div>
             <button class="btn-register" id="btn-open-register">
                 <svg width="11" height="11" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <rect x="1" y="1" width="4" height="4" rx="1" stroke="currentColor" stroke-width="1.2" />
@@ -603,6 +649,10 @@
                     <path d="M9 7v4M7 9h4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" />
                 </svg>
                 Generate registration
+            </button>
+
+            <button class="btn-retry" id="btn-retry-failed">
+                Requeue Failed
             </button>
         </div>
         <div class="stats">
@@ -661,6 +711,12 @@
                 <tbody id="history-body"></tbody>
             </table>
         </div>
+
+        <div class="pager">
+            <button class="btn-page" id="btn-prev-page" disabled>← Previous</button>
+            <span class="pager-label" id="pager-label">Page 1</span>
+            <button class="btn-page" id="btn-next-page" disabled>Next →</button>
+        </div>
     </main>
 
     <script>
@@ -690,10 +746,13 @@
 
         const tracks = {}; // id → track
 
-        function upsert(t) {
-            tracks[t.id] = t;
-            render();
-        }
+        let stats = {
+            Done: 0,
+            Pending: 0,
+            Downloading: 0,
+            Failed: 0
+        }; 
+
 
         // ── DOM builders ───────────────────────────────────────────────
 
@@ -800,13 +859,13 @@
             );
 
             const active = all.filter(t => t.status === 'downloading' || t.status === 'queued');
-            const history = all.filter(t => t.status === 'done' || t.status === 'failed' || t.status === 'skipped');
+            const history = all.filter(t => t.status === 'done' || t.status === 'failed');
 
             // Stats
-            document.getElementById('s-active').textContent = active.filter(t => t.status === 'downloading').length;
-            document.getElementById('s-queued').textContent = active.filter(t => t.status === 'queued').length;
-            document.getElementById('s-done').textContent = all.filter(t => t.status === 'done').length;
-            document.getElementById('s-failed').textContent = all.filter(t => t.status === 'failed').length;
+            document.getElementById('s-active').textContent = stats.Downloading;
+            document.getElementById('s-queued').textContent = stats.Pending;
+            document.getElementById('s-done').textContent = stats.Done
+            document.getElementById('s-failed').textContent = stats.Failed;
 
             // Active cards
             const activeEl = document.getElementById('active-list');
@@ -830,30 +889,6 @@
             }
         }
 
-        // ── SSE ────────────────────────────────────────────────────────
-
-        let es;
-        function connect() {
-            es = new EventSource('/events');
-
-            es.onopen = () => {
-                document.getElementById('conn-dot').className = 'conn-dot live';
-                document.getElementById('conn-label').textContent = 'live';
-            };
-
-            es.onerror = () => {
-                document.getElementById('conn-dot').className = 'conn-dot dead';
-                document.getElementById('conn-label').textContent = 'reconnecting';
-                setTimeout(connect, 3000);
-            };
-
-            es.onmessage = e => {
-                // JSON.parse is safe here; the resulting object properties are only
-                // ever assigned to textContent / attributes, never innerHTML.
-                const t = JSON.parse(e.data);
-                upsert(t);
-            };
-        }
 
         // model
         const openBtn = document.getElementById('btn-open-register');
@@ -902,20 +937,106 @@
             }
         });
 
-        // ── Init ────────────────────────────────────────────────────────
+        // ── Requeue failed ─────────────────────────────────────────────
+        // NOTE: /api/retry does not exist on the backend yet — this is a
+        // mock wiring for a future endpoint that will requeue all failed
+        // tracks (e.g. `POST /api/retry` → sets status='queued' for every
+        // track where status='failed').
 
-        async function init() {
-            const res = await fetch('/api/tracks');
+        const retryBtn = document.getElementById('btn-retry-failed');
+
+        retryBtn.addEventListener('click', async () => {
+            const originalLabel = retryBtn.textContent;
+            retryBtn.disabled = true;
+            retryBtn.textContent = 'Requeuing…';
+
+            try {
+                const res = await fetch('/api/retry', { method: 'POST' });
+                if (!res.ok) throw new Error(`Server error ${res.status}`);
+
+                // Pull the current page again so newly-requeued tracks
+                // show up as "queued" right away.
+                await loadPage(currentFrom);
+                await refreshStats();
+            } catch (err) {
+                console.error('Failed to requeue failed tracks:', err);
+                alert('Failed to requeue failed tracks: ' + err.message);
+            } finally {
+                retryBtn.disabled = false;
+                retryBtn.textContent = originalLabel;
+            }
+        });
+
+        // ── Pagination ─────────────────────────────────────────────────
+        // /api/tracks?from=<id> returns up to 60 tracks with id < from,
+        // newest first. from=0 (or omitted) returns the latest page.
+        // "Next" walks to older tracks using the smallest id on the
+        // current page as the new cursor; "Previous" pops a cursor off
+        // a small history stack to walk back to newer pages.
+
+        let currentFrom = 0;
+        let pageNumber = 1;
+        const pageHistory = []; // stack of previous "from" cursors
+
+        const prevBtn = document.getElementById('btn-prev-page');
+        const nextBtn = document.getElementById('btn-next-page');
+        const pagerLabel = document.getElementById('pager-label');
+
+        async function loadPage(from) {
+            const res = await fetch(`/api/tracks?from=${from}`);
             const list = await res.json();
-            list.forEach(t => { tracks[t.id] = t; });
-            render();
-            connect();
 
-            // Refresh time-ago labels every minute
-            setInterval(render, 60_000);
+            // Each page is a fresh snapshot, not merged with prior pages,
+            // so tracks from a different page never leak into this view.
+            for (const id in tracks) delete tracks[id];
+            list.forEach(t => { tracks[t.id] = t; });
+
+            currentFrom = from;
+            nextBtn.disabled = list.length < 60;
+            prevBtn.disabled = pageHistory.length === 0;
+            pagerLabel.textContent = `Page ${pageNumber}`;
+
+            return list;
         }
 
+        nextBtn.addEventListener('click', async () => {
+            const ids = Object.values(tracks).map(t => t.id);
+            if (ids.length === 0) return;
 
+            const minId = Math.min(...ids);
+            pageHistory.push(currentFrom);
+            pageNumber++;
+            await loadPage(minId);
+        });
+
+        prevBtn.addEventListener('click', async () => {
+            if (pageHistory.length === 0) return;
+
+            const prevFrom = pageHistory.pop();
+            pageNumber--;
+            await loadPage(prevFrom);
+        });
+
+        // ── Init ────────────────────────────────────────────────────────
+
+        async function refreshStats() {
+            const statsRes = await fetch('/api/stats');
+            stats = await statsRes.json();
+        }
+
+        async function init() {
+            await loadPage(currentFrom);
+            await refreshStats();
+
+            // Poll the current page + stats every 30s, preserving whatever
+            // page the user is currently looking at.
+            setInterval(async () => {
+                await loadPage(currentFrom);
+                await refreshStats();
+
+                render();
+            }, 30_000);
+        }
 
         init();
     </script>

@@ -18,6 +18,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -39,7 +40,6 @@ const (
 	StatusDownloading Status = "downloading"
 	StatusDone        Status = "done"
 	StatusFailed      Status = "failed"
-	StatusSkipped     Status = "skipped"
 )
 
 type Track struct {
@@ -72,57 +72,17 @@ func (t *Track) Sanitise() error {
 }
 
 // ─────────────────────────────────────────────
-// SSE broker
-// ─────────────────────────────────────────────
-
-type Broker struct {
-	mu      sync.Mutex
-	clients map[chan []byte]struct{}
-}
-
-func NewBroker() *Broker { return &Broker{clients: make(map[chan []byte]struct{})} }
-
-func (b *Broker) Subscribe() chan []byte {
-	ch := make(chan []byte, 32)
-	b.mu.Lock()
-	b.clients[ch] = struct{}{}
-	b.mu.Unlock()
-	return ch
-}
-
-func (b *Broker) Unsubscribe(ch chan []byte) {
-	b.mu.Lock()
-	delete(b.clients, ch)
-	b.mu.Unlock()
-}
-
-func (b *Broker) Publish(v any) {
-	data, _ := json.Marshal(v)
-	msg := append([]byte("data: "), data...)
-	msg = append(msg, '\n', '\n')
-	b.mu.Lock()
-	for ch := range b.clients {
-		select {
-		case ch <- msg:
-		default:
-		}
-	}
-	b.mu.Unlock()
-}
-
-// ─────────────────────────────────────────────
 // Server
 // ─────────────────────────────────────────────
 
 type Server struct {
 	db     *sql.DB
-	broker *Broker
 	mu     sync.Mutex
 	outDir string
 }
 
 func NewServer(db *sql.DB, outDir string) *Server {
-	return &Server{db: db, broker: NewBroker(), outDir: outDir}
+	return &Server{db: db, outDir: outDir}
 }
 
 // ─────────────────────────────────────────────
@@ -174,15 +134,29 @@ func (s *Server) updateStatus(id int64, status Status, logMsg string) {
 		status, logMsg, time.Now().UTC(), id)
 }
 
-func (s *Server) listTracks() ([]Track, error) {
+// fetch a single failed track to reinsert into the download queue
+func (s *Server) pluckFailed() (track *Track, err error) {
+	row := s.db.QueryRow(
+		`UPDATE tracks SET status = 'queued', updated_at = ?
+		 WHERE id = (
+		     SELECT id FROM tracks WHERE status = 'failed' ORDER BY id LIMIT 1
+		 )
+		 RETURNING id, video_id, title, artist, status, log, created_at, updated_at`,
+		time.Now().UTC().Format(time.RFC3339Nano))
+
+	return scanTrack(row)
+}
+
+func (s *Server) listTracks(from int64) ([]Track, error) {
 	rows, err := s.db.Query(
 		`SELECT id, video_id, title, artist, status, log, created_at, updated_at
-		 FROM tracks ORDER BY created_at DESC LIMIT 60`)
+		 FROM tracks WHERE (id < $1 OR $1 = 0) ORDER BY id DESC LIMIT 60 `, from)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var tracks []Track
+
+	tracks := make([]Track, 0, 60)
 	for rows.Next() {
 		t, err := scanTrack(rows)
 		if err != nil {
@@ -190,7 +164,43 @@ func (s *Server) listTracks() ([]Track, error) {
 		}
 		tracks = append(tracks, *t)
 	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
 	return tracks, nil
+}
+
+type Stats struct {
+	Done        int
+	Pending     int
+	Downloading int
+	Failed      int
+}
+
+func (s *Server) countracks() (Stats, error) {
+	rows, err := s.db.Query(
+		`SELECT
+			COUNT(CASE WHEN status = 'done' THEN 1 END) AS done_count,
+			COUNT(CASE WHEN status = 'pending' THEN 1 END) AS pending_count, 
+			COUNT(CASE WHEN status = 'failed' THEN 1 END) AS failed_count,
+			COUNT(CASE WHEN status = 'downloading' THEN 1 END) AS downloading_count
+		FROM tracks;`)
+	if err != nil {
+		return Stats{}, err
+	}
+
+	defer rows.Close()
+
+	var stat Stats
+	err = rows.Scan(
+		&stat.Done, &stat.Pending, &stat.Failed, &stat.Downloading)
+	if err != nil {
+		return stat, err
+	}
+
+	return stat, nil
 }
 
 type scanner interface {
@@ -215,15 +225,16 @@ func scanTrack(s scanner) (*Track, error) {
 // ─────────────────────────────────────────────
 
 func (s *Server) download(t *Track) {
-	if err := t.Sanitise(); err != nil {
-		s.updateStatus(t.ID, StatusDownloading, "failed to santise track")
-		t.Status = StatusFailed
+	if t.Status != StatusQueued && t.Status != StatusFailed {
 		return
 	}
 
 	s.updateStatus(t.ID, StatusDownloading, "starting download...")
-	t.Status = StatusDownloading
-	s.broker.Publish(t)
+
+	if err := t.Sanitise(); err != nil {
+		s.updateStatus(t.ID, StatusFailed, "failed to santise track")
+		return
+	}
 
 	cleanedPath := filepath.Join("/", filepath.Clean(fmt.Sprintf("%s - %s [%%(id)s].%%(ext)s", t.Title, t.Artist)))
 
@@ -275,17 +286,11 @@ func (s *Server) download(t *Track) {
 
 	if err != nil {
 		s.updateStatus(t.ID, StatusFailed, logStr)
-		t.Status = StatusFailed
-		t.Log = logStr
-		s.broker.Publish(t)
 		log.Printf("[FAIL] %s: %v:\n%s", t.VideoID, err, out)
 		return
 	}
 
 	s.updateStatus(t.ID, StatusDone, logStr)
-	t.Status = StatusDone
-	t.Log = logStr
-	s.broker.Publish(t)
 	log.Printf("[DONE] %s", t.Title)
 }
 
@@ -384,7 +389,6 @@ func (s *Server) handleDownload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	t.ID = id
-	s.broker.Publish(t)
 
 	go s.download(t)
 
@@ -393,9 +397,47 @@ func (s *Server) handleDownload(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]any{"status": "queued", "trackId": id})
 }
 
-// GET /api/tracks — full list
+func (s *Server) retry(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusOK)
+
+	go func() {
+		for {
+			s.mu.Lock()
+			failedTrack, err := s.pluckFailed()
+			s.mu.Unlock()
+
+			if err != nil {
+				// eventually this hits no rows and we leave this
+				return
+			}
+
+			log.Println("retrying download of failed track: ", failedTrack.Title, failedTrack.VideoID)
+
+			s.download(failedTrack)
+
+			time.Sleep(5 * time.Minute)
+		}
+
+	}()
+}
+
+// GET /api/tracks - return the last 60 tracks
 func (s *Server) handleTracks(w http.ResponseWriter, r *http.Request) {
-	tracks, err := s.listTracks()
+
+	var (
+		from int64
+		err  error
+	)
+	if offset := r.URL.Query().Get("from"); offset != "" {
+		from, err = strconv.ParseInt(offset, 10, 64)
+		if err != nil {
+			log.Println("invalid from offset: ", err)
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+	}
+
+	tracks, err := s.listTracks(from)
 	if err != nil {
 		log.Println("failed to list tracks: ", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -406,6 +448,18 @@ func (s *Server) handleTracks(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(tracks)
+}
+
+// GET /api/stats
+func (s *Server) stats(w http.ResponseWriter, r *http.Request) {
+	stats, err := s.countracks()
+	if err != nil {
+		log.Println("failed to count tracks: ", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(stats)
 }
 
 // POST /api/register — set the registration information and generate api key
@@ -480,51 +534,6 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 	}{
 		Url: u.String(),
 	})
-}
-
-// GET /events — SSE stream
-func (s *Server) handleSSE(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("Connection", "keep-alive")
-
-	ch := s.broker.Subscribe()
-	defer s.broker.Unsubscribe(ch)
-
-	flusher, ok := w.(http.Flusher)
-	if !ok {
-		http.Error(w, "streaming unsupported", http.StatusInternalServerError)
-		return
-	}
-
-	// Do initial connection to make the connection be present as "alive"
-	fmt.Fprintf(w, ": keepalive\n\n")
-	flusher.Flush()
-
-	// Send a keepalive comment every 15 s
-	ticker := time.NewTicker(15 * time.Second)
-	defer ticker.Stop()
-
-	ctx := r.Context()
-	for {
-		var err error
-		select {
-		case <-ctx.Done():
-			return
-		case msg := <-ch:
-			_, err = w.Write(msg)
-
-		case <-ticker.C:
-			_, err = fmt.Fprintf(w, ": keepalive\n\n")
-		}
-
-		if err != nil {
-			log.Println("client disconnected: ", err)
-			return
-		}
-
-		flusher.Flush()
-	}
 }
 
 // GET / — embedded web UI
@@ -672,8 +681,10 @@ func main() {
 	mux.HandleFunc("POST /check", srv.requireAuth(srv.handleCheck))
 
 	mux.HandleFunc("GET /api/tracks", srv.handleTracks)
+	mux.HandleFunc("GET /api/stats", srv.stats)
+	mux.HandleFunc("POST /api/retry", srv.retry)
+
 	mux.HandleFunc("POST /api/register", srv.handleRegister)
-	mux.HandleFunc("/events", srv.handleSSE)
 	server := &http.Server{
 		Addr:         Config.Addr,
 		Handler:      http.MaxBytesHandler(mux, 1024*1024),
