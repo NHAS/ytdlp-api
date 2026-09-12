@@ -958,6 +958,7 @@
                 // show up as "queued" right away.
                 await loadPage(currentFrom);
                 await refreshStats();
+                render();
             } catch (err) {
                 console.error('Failed to requeue failed tracks:', err);
                 alert('Failed to requeue failed tracks: ' + err.message);
@@ -996,7 +997,7 @@
             prevBtn.disabled = pageHistory.length === 0;
             pagerLabel.textContent = `Page ${pageNumber}`;
 
-            return list;
+            render();
         }
 
         nextBtn.addEventListener('click', async () => {
