@@ -751,7 +751,7 @@
             Pending: 0,
             Downloading: 0,
             Failed: 0
-        }; 
+        };
 
 
         // ── DOM builders ───────────────────────────────────────────────
@@ -772,8 +772,8 @@
             const artist = element('div', 'track-artist', t.artist || '—');
 
             const url = document.createElement("a");
-            url.href = "https://music.youtube.com/watch?v="+t.video_id
-            url.textContent = "https://music.youtube.com/watch?v="+t.video_id
+            url.href = "https://music.youtube.com/watch?v=" + t.video_id
+            url.textContent = "https://music.youtube.com/watch?v=" + t.video_id
             url.className = "track-url"
 
             info.append(title, artist, url);
@@ -826,13 +826,13 @@
             const tdStatus = document.createElement('td');
             tdStatus.append(makeBadge(t.status));
 
-        
+
             const tdUrl = element('td');
-            tdUrl.title = "https://music.youtube.com/watch?v="+t.video_id;
+            tdUrl.title = "https://music.youtube.com/watch?v=" + t.video_id;
 
             const url = document.createElement("a");
-            url.href = "https://music.youtube.com/watch?v="+t.video_id
-            url.textContent = "https://music.youtube.com/watch?v="+t.video_id
+            url.href = "https://music.youtube.com/watch?v=" + t.video_id
+            url.textContent = "https://music.youtube.com/watch?v=" + t.video_id
             url.target = "_blank"
             url.className = "td td-url"
 
@@ -1030,12 +1030,11 @@
             await refreshStats();
             render();
 
-            // Poll the current page + stats every 30s, preserving whatever
-            // page the user is currently looking at.
-            setInterval(update, 30_000);
+
         }
 
         update();
+        setInterval(update, 30_000);
     </script>
 </body>
 
